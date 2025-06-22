@@ -54,7 +54,7 @@ userSchema.pre('save', async function (next) {  // dont pass callbackk () => {} 
     
     if(!this.isModified('password')) return next(); // this will only encrpt pswd when this field is modified 
 
-    this.password = bcrypt.hash(this.password,10)
+    this.password = await bcrypt.hash(this.password,10)
     next()
 })
 

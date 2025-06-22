@@ -27,4 +27,14 @@ app.use(express.static('public'))// Ye public folder ko static bana deta hai. Ma
 
 app.use(cookieParser())
 
+
+// import routes
+import userRouter  from './routes/user.route.js';
+
+// routes declaration using middleware
+app.use('/api/users',userRouter)
+
+// https://localhost:8000/api/users/register
+// https://localhost:8000/api/users/login
+
 export default app;
