@@ -1,0 +1,80 @@
+/*
+✅ Example 1: With ApiError, ApiResponse, asyncHandler
+
+// controllers/userController.js
+import { ApiError } from '../utils/ApiError.js';
+import { ApiResponse } from '../utils/ApiResponse.js';
+import asyncHandler from '../utils/asyncHandler.js';
+import User from '../models/userModel.js'; // Mongoose Model
+
+const getUserById = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  const response = new ApiResponse(200, user, 'User fetched successfully');
+  res.status(200).json(response);
+});
+
+export { getUserById };
+
+res if user find
+
+{
+  "statusCode": 200,
+  "data": {
+    "_id": "123",
+    "name": "Ali"
+  },
+  "message": "User fetched successfully",
+  "success": true
+}
+
+res if user not find
+
+{
+  "success": false,
+  "message": "User not found",
+  "errors": [],
+}
+
+
+❌ Example 2: Without ApiError, ApiResponse, or asyncHandler
+
+// routes/userRoutes.js
+import express from 'express';
+import User from '../models/userModel.js';
+
+const router = express.Router();
+
+router.get('/user/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user,
+      message: 'User fetched successfully'
+    });
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong'
+    });
+  }
+});
+
+export default router;
+
+*/
