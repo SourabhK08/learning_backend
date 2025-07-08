@@ -306,7 +306,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required");
   }
 
-  const user = User.findByIdAndUpdate(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
@@ -322,34 +322,124 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Account details updated successfully"));
 });
 
-const updateUserAvatar = asyncHandler(async(req,res) => {
-  const avatarLocalPath = req.file?.path
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
 
-  if(!avatarLocalPath){
-    throw new ApiError(400,'Avatar file is missing')
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is missing");
   }
 
-  const avatar = uploadOnCloudinary(avatarLocalPath)
-  if(!avatar.url){
-    throw new ApiError(400,'Error while uploading avatar')
+  const avatar = uploadOnCloudinary(avatarLocalPath);
+  if (!avatar.url) {
+    throw new ApiError(400, "Error while uploading avatar");
   }
 
- const updatedAvatar = await User.findByIdAndUpdate(
-  req.user?._id,
-  {
-    $set:{
-      avatar:avatar?.url
-    }
-  },
-  {new:true}
- ).select("-password")
+  const updatedAvatar = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: avatar?.url,
+      },
+    },
+    { new: true }
+  ).select("-password");
 
- return res
- .status(200)
- .json(new ApiResponse(200,updatedAvatar,'Avatar updated successfully'))
-})
+  // IMPLEMENT FEATURE OF DELETING OLD IMAGE WHICH IS ON CLOUDINARY AFTER SETTING UP NEW ONE
+
+  // MAKE A UTILITY FUNCTION
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedAvatar, "Avatar updated successfully"));
+});
 
 // same for cover image
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+
+  // aggregation pipelines ==>>> User.aggregate( [ { 1 pipeline },{ 2 pipeline} ..... ] ) remember always returns an array
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions", // models in db always stores in lowercase & plural(..s)
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers", // kis kis ne mujhe subscribe kra h
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo", // meine kis kis ko subscribe kiya h
+      },
+    },
+    {
+      // this pipeline will add all new data into prev one so that we can share data at once
+
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers", // $ => bcoz it's field here
+        },
+        channelsSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+
+        // this is for frontend we are sending like a flag subscribed / follow means user has subscribed or not
+
+        isSubscribed: {
+          $cond: {
+            if: {
+              // jo apne pas document aya h subscribers usme mai hoon ya nhi
+
+              // in operator calculates , it can take array / object
+
+              $in: [req.user?._id, "$subscribers.subscriber"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        // it gives projection that all values are not shown, only selected values are given
+        // 1 -> shown , 0 -> hidden
+
+        fullname: 1,
+        username: 1,
+        subscribersCount: 1,
+        channelsSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+      },
+    },
+  ]);
+
+  console.log("channel aggreagate result ", channel);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "Channel does not exists");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, channel[0], "User channel fetched successfully") // sending object to frontend not array( only 1 value at 0th index)
+  );
+});
 
 export {
   registerUser,
@@ -359,5 +449,6 @@ export {
   changeCurrentPassword,
   getCurrentUser,
   updateAccountDetails,
-  updateUserAvatar
+  updateUserAvatar,
+  getUserChannelProfile,
 };
