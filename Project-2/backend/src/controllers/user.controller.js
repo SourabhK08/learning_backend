@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -204,8 +205,8 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -441,6 +442,73 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   );
 });
 
+const getWatchHistory = asyncHandler(async (req, res) => {
+  //req.user?._id  => this will return us string then automatically mongoose will convert this into ObjectId of mongoDb
+
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id), // in aggregation pipelines code will go directly so we have to convert this
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+
+        // till now we get docs and now we want to find who is the owner of the video
+
+        // nested pipeline || we can use populate method also
+
+        pipeline: [
+          {
+            // we are in video model
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+
+              // from this we got all user data so we need to give some data as a response
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+
+          // this is done for sending response bcoz we got array as res and sending obj to frontend
+
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully"
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -451,4 +519,5 @@ export {
   updateAccountDetails,
   updateUserAvatar,
   getUserChannelProfile,
+  getWatchHistory,
 };
